@@ -54,6 +54,10 @@ class EmailValidator < ActiveModel::EachValidator
       end
     end
 
+    def regexp_safe_domain(options)
+      options[:domain].sub(/\./, '\.')
+    end
+
     protected
 
     def loose_regexp(options = {})
@@ -152,14 +156,24 @@ class EmailValidator < ActiveModel::EachValidator
       options[:require_fqdn] = true if options[:require_fqdn].nil? && options[:mode] == :strict
       default_options.merge(options)
     end
-
-    def regexp_safe_domain(options)
-      options[:domain].sub(/\./, '\.')
-    end
   end
 
   def validate_each(record, attribute, value)
     options = @@default_options.merge(self.options)
-    record.errors.add(attribute, options[:message] || :invalid) unless self.class.valid?(value, options)
+
+    return if self.class.valid?(value, options)
+
+    domain = options[:domain]
+    if !domain.nil? && !value[/^.*@#{regexp_safe_domain(options)}$/]
+      record.errors.add(attribute, options[:message] || :invalid_email_domain, domain:)
+    else
+      record.errors.add(attribute, options[:message] || :invalid_email)
+    end
+  end
+
+  private
+
+  def regexp_safe_domain(options)
+    self.class.regexp_safe_domain(options)
   end
 end
